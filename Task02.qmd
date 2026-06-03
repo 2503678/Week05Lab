@@ -4,12 +4,11 @@ format: html
 editor: visual
 ---
 
-Visualizing swish() Activation Function and its Gradient Toy Examples Calling swish() and relu() Exploring Other Activation Functions ---
+Task 2: Activation Function Analysis
 
+---
 
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+## **2.1 Visualizing `swish()` Activation Function and its Gradient**
 
 ```{r}
 #| echo: true
@@ -67,10 +66,6 @@ ggplot(tbl_d_swish, aes(x, y)) +
 
 ```
 
+Unlike ReLU, whose gradient is strictly 0 for negative inputs and 1 for positive inputs, the gradient of Swish is smooth and non-zero for most inputs, with values that gradually transition rather than abruptly cut off. This helps avoid the **dying neuron problem** seen in ReLU, where neurons with negative inputs stop learning entirely. However, Swish is computationally more expensive as it requires calculating the sigmoid function, whereas ReLU involves only a simple threshold operation.
 
-
-
-
-
-
-
+## **2.2 Toy Examples Calling `swish()` and `relu()`**
