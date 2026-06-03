@@ -76,8 +76,10 @@ Unlike ReLU, whose gradient is strictly 0 for negative inputs and 1 for positive
 
 student_ids <- c(2501174, 2501901, 2500511, 2503678, 2501103)
 
+student_ids <- c(2501174, 2501901, 2500511, 2503678, 2501103)
+seed <- as.integer(median(student_ids))
 # Replace with the median of your team's student IDs
-set.seed(2500511)  # <-- change this to your team's median student ID
+set.seed(seed)  # <-- change this to your team's median student ID
 
 # Define relu() if not already defined
 relu <- function(x) {
@@ -152,3 +154,27 @@ tbl_long |>
   )
 
 ```
+
+## **2.3 Exploring Activation Functions**
+
+```{r}
+#| eval: true
+#| echo: true
+
+# Define ELU function (alpha = 1 by default)
+elu <- function(x, alpha = 1) {
+  ifelse(x > 0, x, alpha * (exp(x) - 1))
+}
+
+# Add elu_x column to existing tibble
+tbl_activations <- tbl_activations |>
+  mutate(elu_x = round(elu(x), 2))
+
+# Display first 10 rows with selected columns
+tbl_activations |>
+  select(x, swish_x, relu_x, elu_x) |>
+  head(10)
+```
+
+Description of other activation functions:
+ELU is an activation function that outputs the input directly if positive, but uses an exponential curve for negative values to smooth gradients and prevent inactive neurons
