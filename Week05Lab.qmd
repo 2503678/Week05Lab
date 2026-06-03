@@ -93,7 +93,7 @@ population <- read_csv("population.csv")
 
 ``` {r}
 # Task 1.3: Removing Rows not Pertaining to Countries
-country_codes <- read.csv("country_codes.csv")
+country_codes <- read_csv("country_codes.csv")
 nrow(indicator)
 nrow(population)
 
