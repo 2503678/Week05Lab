@@ -4,14 +4,8 @@ format: html
 editor: visual
 ---
 
-Visualizing swish() Activation Function and its Gradient
-Toy Examples Calling swish() and relu()
-Exploring Other Activation Functions
----
+Visualizing swish() Activation Function and its Gradient Toy Examples Calling swish() and relu() Exploring Other Activation Functions ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
 
 ## Running Code
 
@@ -48,3 +42,35 @@ ggplot(tbl_swish, aes(x, y)) +
 ```
 
 The `echo: false` option disables the printing of code (only output is displayed).
+
+```{r}
+#| eval: true
+#| echo: true
+#| output: true
+#| label: fig-d-swish
+#| fig-cap: "Gradient of Swish Activation Function"
+#| fig-width: 7
+#| fig-height: 4
+
+d_swish <- function(x) {
+  sigmoid <- 1 / (1 + exp(-x))
+  sigmoid + x * sigmoid * (1 - sigmoid)
+}
+
+x <- -10:10
+y <- d_swish(x)
+tbl_d_swish <- tibble(x, y)
+
+ggplot(tbl_d_swish, aes(x, y)) +
+  geom_line(color = "darkblue", linewidth = 1) +
+  labs(x = "x", y = "d_swish(x)")
+
+```
+
+
+
+
+
+
+
+
