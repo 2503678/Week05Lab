@@ -178,3 +178,30 @@ tbl_activations |>
 
 Description of other activation functions:
 ELU is an activation function that outputs the input directly if positive, but uses an exponential curve for negative values to smooth gradients and prevent inactive neurons
+
+
+## 3. Reflection on the Use of Generative AI
+
+##** 3.1 Gen AI Tool used & Rationale**
+Our team used Claude 4.6 Sonnet for this assessment. We chose it because it demonstrates better performance in handling programming languages and code logic compared to other available AI tools.
+
+##** 3.2 Examples of usage of GenAI tool**
+We utilized Claude as a quality-assurance and documentation partner:
+
+Code Verification: We used it to check our syntax and verify code outputs, catching edge cases early.
+
+Documentation: It helped write clear code comments and descriptions, translating complex logic into easily readable documentation.
+
+##** 3.3 Key Benefits**
+The tool acted as an effective teaching aid. Instead of just fixing code, it explained core programming concepts by pinpointing specific code lines. This deepened our understanding of our own codebase.
+
+##  3.4 Challenges & Limitations
+The main challenge was managing AI hallucinations. The tool occasionally produced inaccurate logic or non-existent syntax. This taught us a critical lesson: AI outputs cannot be taken at face value and always require rigorous manual verification.
+
+##  3.5 Future Usage
+In my future studies and career, I will use GenAI as a learning aid to break down unfamiliar technical concepts and deepening my understanding of newer topics.
+
+##  3.6 Additional Thoughts
+GenAI should supplement learning, not replace critical thinking. While everyone should leverage these tools to boost productivity, we must always use our own knowledge and expertise to monitor, evaluate, and check the AI's output.
+
+What do yall think?
