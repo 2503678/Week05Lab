@@ -35,6 +35,8 @@ readr::read_csv("world_bank_total_population/Metadata_Country_API_SP.POP.TOTL_DS
 
 ```
 
+# Task 1.1: Cleaning the Data
+
 ``` {r}
 # Task 1.1: Cleaning the Data
 clean_up_wb_csv <- function(
