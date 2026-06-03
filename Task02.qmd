@@ -66,6 +66,114 @@ ggplot(tbl_d_swish, aes(x, y)) +
 
 ```
 
-Unlike ReLU, whose gradient is strictly 0 for negative inputs and 1 for positive inputs, the gradient of Swish is smooth and non-zero for most inputs, with values that gradually transition rather than abruptly cut off. This helps avoid the **dying neuron problem** seen in ReLU, where neurons with negative inputs stop learning entirely. However, Swish is computationally more expensive as it requires calculating the sigmoid function, whereas ReLU involves only a simple threshold operation.
+Unlike ReLU, whose gradient is strictly 0 for negative inputs and 1 for positive inputs, the gradient of Swish is smooth and non-zero for most inputs, with values that gradually transition rather than being abruptly cut off. This helps avoid the dying neuron problem seen in ReLU, where neurons with negative inputs stop learning entirely. However, Swish is computationally more expensive as it requires calculating the sigmoid function, while ReLU involves only a simple threshold operation.
 
 ## **2.2 Toy Examples Calling `swish()` and `relu()`**
+
+```{r}
+#| eval: true
+#| echo: true
+
+student_ids <- c(2501174, 2501901, 2500511, 2503678, 2501103)
+
+# Replace with the median of your team's student IDs
+set.seed(2500511)  # <-- change this to your team's median student ID
+
+# Define relu() if not already defined
+relu <- function(x) {
+  ifelse(x > 0, x, 0)
+}
+
+# Generate 100 random values between -10 and 10
+x <- runif(100, min = -10, max = 10)
+
+# Create tibble
+tbl_activations <- tibble(
+  x        = x,
+  swish_x  = round(swish(x), 2),
+  relu_x   = round(relu(x), 2)
+)
+
+# Display first 10 rows
+head(tbl_activations, 10)
+```
+
+```{r}
+#| eval: true
+#| echo: true
+
+# Add is_dead column
+tbl_activations <- tbl_activations |>
+  mutate(is_dead = relu_x == 0)
+
+# Display first 10 rows with selected columns
+tbl_activations |>
+  select(x, swish_x, relu_x, is_dead) |>
+  head(10)
+
+# Summary table
+tbl_summary <- tibble(
+  relu_dead_count = sum(tbl_activations$is_dead),
+  swish_mean      = round(mean(tbl_activations$swish_x), 2),
+  swish_sd        = round(sd(tbl_activations$swish_x), 2),
+  relu_mean       = round(mean(tbl_activations$relu_x), 2),
+  relu_sd         = round(sd(tbl_activations$relu_x), 2)
+)
+
+tbl_summary
+```
+The statistics support the claim that Swish avoids dead neurons. While ReLU produces exactly zero for all negative inputs while  being reflected by a non-zero relu_dead_count of approximately 50 out of 100 samples, Swish returns small but non-zero values for negative inputs. Swish also shows a higher mean and standard deviation compared to ReLU, indicating more active and varied neuron outputs, which promotes better gradient flow and more effective learning during training.
+
+```{r}
+#| eval: true
+#| echo: true
+
+# Add is_dead column
+tbl_activations <- tbl_activations |>
+  mutate(is_dead = relu_x == 0)
+
+# Display first 10 rows with selected columns
+tbl_activations |>
+  select(x, swish_x, relu_x, is_dead) |>
+  head(10)
+
+# One-row summary table
+tbl_summary <- tbl_activations |>
+  summarise(
+    relu_dead_count = sum(is_dead),
+    swish_mean      = round(mean(swish_x), 2),
+    swish_sd        = round(sd(swish_x), 2),
+    relu_mean       = round(mean(relu_x), 2),
+    relu_sd         = round(sd(relu_x), 2)
+  )
+
+tbl_summary
+```
+
+```{r}
+#| eval: true
+#| echo: true
+
+# Reshape to long format
+tbl_long <- tbl_activations |>
+  select(x, swish_x, relu_x) |>
+  pivot_longer(
+    cols      = c(swish_x, relu_x),
+    names_to  = "function_name",
+    values_to = "activation_value"
+  )
+
+# Display first 10 rows
+head(tbl_long, 10)
+
+# Summary table grouped by function_name
+tbl_long |>
+  group_by(function_name) |>
+  summarise(
+    mean = round(mean(activation_value), 2),
+    sd   = round(sd(activation_value), 2),
+    min  = round(min(activation_value), 2),
+    max  = round(max(activation_value), 2)
+  )
+
+```
