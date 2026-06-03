@@ -4,6 +4,11 @@ format: html
 editor: visual
 ---
 
+Visualizing swish() Activation Function and its Gradient
+Toy Examples Calling swish() and relu()
+Exploring Other Activation Functions
+---
+
 ## Quarto
 
 Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
@@ -13,14 +18,33 @@ Quarto enables you to weave together content and executable code into a finished
 When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
 
 ```{r}
-1 + 1
+#| echo: true
+library(tidyverse)
 ```
 
 You can add options to executable code like this
 
 ```{r}
-#| echo: false
-2 * 2
+
+#| eval: true
+#| echo: true
+#| label: fig-swish
+#| fig-cap: "Swish Activation Function"
+#| fig-width: 7
+#| fig-height: 4
+
+swish <- function(x) {
+  x / (1 + exp(-x))
+}
+
+x <- -10:10
+y <- swish(x)
+tbl_swish <- tibble(x, y)
+
+ggplot(tbl_swish, aes(x, y)) +
+  geom_line(color = "darkblue", linewidth = 1) +
+  labs(x = "x", y = "swish(x)")
+
 ```
 
 The `echo: false` option disables the printing of code (only output is displayed).
