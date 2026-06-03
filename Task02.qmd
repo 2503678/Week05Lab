@@ -6,7 +6,7 @@ editor: visual
 
 Task 2: Activation Function Analysis
 
----
+------------------------------------------------------------------------
 
 ## **2.1 Visualizing `swish()` Activation Function and its Gradient**
 
@@ -122,33 +122,8 @@ tbl_summary <- tibble(
 
 tbl_summary
 ```
-The statistics support the claim that Swish avoids dead neurons. While ReLU produces exactly zero for all negative inputs while  being reflected by a non-zero relu_dead_count of approximately 50 out of 100 samples, Swish returns small but non-zero values for negative inputs. Swish also shows a higher mean and standard deviation compared to ReLU, indicating more active and varied neuron outputs, which promotes better gradient flow and more effective learning during training.
 
-```{r}
-#| eval: true
-#| echo: true
-
-# Add is_dead column
-tbl_activations <- tbl_activations |>
-  mutate(is_dead = relu_x == 0)
-
-# Display first 10 rows with selected columns
-tbl_activations |>
-  select(x, swish_x, relu_x, is_dead) |>
-  head(10)
-
-# One-row summary table
-tbl_summary <- tbl_activations |>
-  summarise(
-    relu_dead_count = sum(is_dead),
-    swish_mean      = round(mean(swish_x), 2),
-    swish_sd        = round(sd(swish_x), 2),
-    relu_mean       = round(mean(relu_x), 2),
-    relu_sd         = round(sd(relu_x), 2)
-  )
-
-tbl_summary
-```
+The statistics support the claim that Swish avoids dead neurons. While ReLU produces exactly zero for all negative inputs while being reflected by a non-zero relu_dead_count of approximately 50 out of 100 samples, Swish returns small but non-zero values for negative inputs. Swish also shows a higher mean and standard deviation compared to ReLU, indicating more active and varied neuron outputs, which promotes better gradient flow and more effective learning during training.
 
 ```{r}
 #| eval: true
