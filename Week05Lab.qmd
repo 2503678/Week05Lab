@@ -41,48 +41,71 @@ clean_up_wb_csv <- function(
     in_file_name,
     out_file_name) {
   
-  # Read the CSV starting from row 5.
-  wb_data <- read.csv(
-    in_file_name,
-    skip = 4,
-    header = TRUE,
-    stringsAsFactors = FALSE,
-    check.names = FALSE
-  )
-
-  # Remove completely empty columns
-  wb_data <- wb_data[, colSums(!is.na(wb_data) & wb_data != "") > 0]
-  
-  # Remove completely empty rows
-  wb_data <- wb_data[rowSums(!is.na(wb_data) & wb_data != "") > 0, ]
-  
-  # Clean column names by removing extra spaces
-  names(wb_data) <- trimws(names(wb_data))
-  
-  # Remove rows where Country Name is missing
-  if ("Country Name" %in% names(wb_data)) {
-    wb_data <- wb_data[wb_data$`Country Name` != "" & !is.na(wb_data$`Country Name`), ]
+  is_empty <- function(x) {
+    if (is.character(x)) {
+      is.na(x) | trimws(x) == ""
+    } else {
+      is.na(x)
+    }
   }
   
-  # Save the cleaned CSV
-  write.csv(
-    wb_data,
-    out_file_name,
-    row.names = FALSE
-  )
+  wb_data <- read_csv(
+    in_file_name,
+    skip = 4,
+    na = c("", "NA", ".."),
+    show_col_types = FALSE
+  ) |>
+    # Clean column names
+    rename_with(trimws) |>
+    
+    # Remove columns C and D, if they exist
+    select(-any_of(c("Indicator Name", "Indicator Code"))) |>
+    
+    # Remove completely empty columns
+    select(where(~ !all(is_empty(.x)))) |>
+    
+    # Remove completely empty rows
+    filter(if_any(everything(), ~ !is_empty(.x))) |>
+    
+    # Remove rows without country names
+    filter(
+      !is.na(`Country Name`),
+      trimws(`Country Name`) != ""
+    )
+  
+  write_csv(wb_data, out_file_name)
+  
+  return(wb_data)
 }
 ```
 
 ```{r}
 # Task 1.2: Importing the Data as Data Frame
-indicator <- clean_up_wb_csv("AdjustedNetNationalIncome/API_NY.ADJ.NNTY.KD_DS2_en_csv_v2_3377.csv", "indicator.csv")
+clean_up_wb_csv("AdjustedNetNationalIncome/API_NY.ADJ.NNTY.KD_DS2_en_csv_v2_3377.csv", "indicator.csv")
+indicator <- read_csv("indicator.csv")
 
-population <- clean_up_wb_csv("world_bank_total_population/API_SP.POP.TOTL_DS2_en_csv_v2_267553.csv", "population.csv")
+
+clean_up_wb_csv("world_bank_total_population/API_SP.POP.TOTL_DS2_en_csv_v2_267553.csv", "population.csv")
+population <- read_csv("population.csv")
 ```
 
 ``` {r}
 # Task 1.3: Removing Rows not Pertaining to Countries
 country_codes <- read.csv("country_codes.csv")
+nrow(indicator)
+nrow(population)
+
+reducing_function <- function(
+    old_table, new_table, country_codes) {
+  new_table <- old_table |>
+  semi_join(country_codes, by = c("Country Code" = "country_code"))
+}
+
+population_reduced <- reducing_function(population, population_reduced, country_codes)
+indicator_reduced <- reducing_function(indicator, indicator_reduced, country_codes)
+
+population_reduced
+indicator_reduced
 
 ```
 
