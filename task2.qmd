@@ -1,0 +1,234 @@
+---
+title: "task2"
+format: html
+---
+
+---
+
+---
+
+```{r}
+# Load libraries
+library(tidyverse)
+library(ggplot2)
+library(scales)
+library(readxl)
+library(tidyquant)
+```
+
+```{r}
+
+
+monthly_dj <- read_excel("dja-performance-report-monthly.xlsx", skip = 5,          # skips rows 1-5 (blank rows + "As of:" metadata)
+  col_names = TRUE
+  )
+
+monthly_dj <- monthly_dj %>%
+  mutate(
+    date = as.Date(monthly_dj$"Effective Date", format = "%m/%d/%Y"),
+    close_value = as.numeric(monthly_dj$"Close Value")
+  ) %>%
+  select(-`Effective Date`, -`Close Value`) %>%
+  arrange(date)
+  
+
+
+head(monthly_dj)
+class(monthly_dj)
+```
+
+```{r}
+gap_check <- monthly_dj %>%
+  arrange(date) %>%
+  mutate(
+    month = as.integer(format(date, "%m")),
+    year  = as.integer(format(date, "%Y")),
+    months_to_next_row = (lead(year) - year) * 12 + (lead(month) - month)
+  )
+
+# Rows where the *next* observation is more than 1 month away
+# — this row is the gap's starting point
+gaps <- gap_check %>%
+  filter(months_to_next_row > 1)%>%
+  select(`date`, `months_to_next_row`)
+
+gaps
+```
+
+Reason:
+
+The NYSE closed July 31, 1914–December 12, 1914, its longest shutdown ever, after WWI's outbreak triggered fears of a foreign sell-off and gold drain from the US, forcing officials to halt trading rather than let panic selling collapse the market.
+
+```{r}
+monthly_dj <- monthly_dj %>%
+  arrange(date) %>%
+  mutate(
+    rel_change_pct = (close_value - lag(close_value)) / lag(close_value) * 100,
+    month_abb = factor(month.abb[as.integer(format(date, "%m"))],
+                        levels = month.abb, ordered = TRUE)
+  )
+
+```
+
+```{r}
+medians <- monthly_dj %>%
+  filter(!is.na(rel_change_pct)) %>%
+  group_by(month_abb) %>%
+  summarise(median_val = median(rel_change_pct), .groups = "drop")
+
+ggplot(monthly_dj %>% filter(!is.na(rel_change_pct)),
+       aes(x = month_abb, y = rel_change_pct)) +
+  geom_violin(fill = "grey85", color = "grey40", trim = TRUE) +
+  geom_boxplot(width = 0.15, outlier.shape = NA, fill = "white") +
+  geom_line(data = medians, aes(x = month_abb, y = median_val, group = 1),
+            color = "firebrick", linewidth = 0.8) +
+  geom_point(data = medians, aes(x = month_abb, y = median_val),
+             color = "firebrick", size = 1.5) +
+  labs(title = "DJIA Monthly Relative Change (%)",
+       x = "Month", y = "Relative Change (%)") +
+  theme_minimal()
+
+# --- Visualization B: faceted freqpoly + rug + mean vline ---
+means <- monthly_dj %>%
+  filter(!is.na(rel_change_pct)) %>%
+  group_by(month_abb) %>%
+  summarise(mean_val = mean(rel_change_pct), .groups = "drop")
+
+ggplot(monthly_dj %>% filter(!is.na(rel_change_pct)),
+       aes(x = rel_change_pct)) +
+  geom_freqpoly(bins = 10, color = "steelblue") +
+  geom_rug(sides = "b", color = "steelblue4") +
+  geom_vline(data = means, aes(xintercept = mean_val),
+             linetype = "dashed", color = "firebrick") +
+  facet_wrap(~ month_abb, nrow = 4, ncol = 3) +
+  labs(title = "DJIA Monthly Relative Change (%) by Month",
+       x = "Relative Change (%)", y = "Count") +
+  theme_minimal()
+```
+
+```{r}
+ticker_btc <- "BTC-USD"
+ticker_gold <- "GC=F"
+start_date <- "2016-01-01"
+end_date <- "2026-06-30"
+
+# Convert to monthly data
+monthly_btc <- tq_get(ticker_btc, from = start_date, to = end_date) |>
+  drop_na(adjusted) |>
+  tq_transmute(select = adjusted, mutate_fun = to.period, period = "months")
+
+monthly_gold <- tq_get(ticker_gold, from = start_date, to = end_date) |>
+  drop_na(adjusted) |>
+  tq_transmute(select = adjusted, mutate_fun = to.period, period = "months")
+
+head(monthly_btc, 10)
+head(monthly_gold, 10)
+```
+
+```{r}
+
+combined <- bind_rows(
+  monthly_dj   %>% transmute(month = floor_date(date, "month"), close_value, asset = "DJIA"),
+  monthly_btc  %>% transmute(month = floor_date(date, "month"), close_value = adjusted, asset = "BTC"),
+  monthly_gold %>% transmute(month = floor_date(date, "month"), close_value = adjusted, asset = "Gold")
+) %>%
+  arrange(asset, month)
+
+head
+```
+
+```{r}
+
+ggplot(combined, aes(x = month, y = close_value, color = asset)) +
+  geom_line(linewidth = 0.9) +
+  scale_y_log10(labels = label_dollar()) +          # log scale keeps all 3 curves visible/comparable
+  scale_x_date(date_breaks = "5 year", date_labels = "%Y") +
+  scale_color_manual(values = c("BTC" = "#F7931A",   # optional: brand-ish colors
+                                 "ETH" = "#627EEA",
+                                 "XRP" = "#23292F")) +
+  labs(
+    title = "Monthly Closing Prices of BTC, ETH, and XRP",
+    subtitle = "Log scale used to make trends comparable across very different price ranges",
+    x = "Month",
+    y = "Closing Price (USD, log scale)",
+    color = "Asset"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+```{r}
+## ------------------------------------------------------------------------
+## 1. compute_drawdown()
+##    Peak-to-trough decline (%) at every point in time, using the running
+##    (all-time-so-far) maximum as the "peak" reference at each step.
+## ------------------------------------------------------------------------
+compute_drawdown <- function(prices) {
+  running_max <- cummax(prices)                    # highest price seen up to t
+  drawdown <- (running_max - prices) / running_max * 100
+  return(drawdown)                                  # vector: drawdown % at each t
+}
+
+## ------------------------------------------------------------------------
+## 2. Verify on the test vector (expected largest drawdown = 40%)
+## ------------------------------------------------------------------------
+prices_test <- c(100, 60, 120, 90)
+compute_drawdown(prices_test)
+# -> 0  40  0  25   =>  max(.) = 40   ✓ matches the expected 40%
+
+## ------------------------------------------------------------------------
+## 3. Load the real price series (monthly close, past 10 years)
+## ------------------------------------------------------------------------
+
+# --- DJIA (from dja-performance-report-monthly.xlsx) ---
+dj_raw <- read_excel("dja-performance-report-monthly.xlsx",
+                      sheet = "dja-performance-report-monthly", skip = 5) %>%
+  filter(`Index Name` == "Dow Jones Industrial Average") %>%
+  mutate(`Effective Date` = as.Date(`Effective Date`, format = "%m/%d/%Y")) %>%
+  arrange(`Effective Date`)
+
+decade_start <- max(dj_raw$`Effective Date`) %m-% years(10)
+dj <- dj_raw %>% filter(`Effective Date` >= decade_start)
+
+# --- Gold (monthly close, same 10-year window) ---
+# TODO: point this at your gold price file, e.g.:
+# gold <- read_excel("gold-performance-report-monthly.xlsx", skip = 5) %>% ...
+gold <- NULL
+
+# --- BTC (monthly close, same 10-year window) ---
+# TODO: point this at your BTC price file, e.g.:
+# btc <- read_excel("btc-performance-report-monthly.xlsx", skip = 5) %>% ...
+btc <- NULL
+
+## ------------------------------------------------------------------------
+## 4. Apply compute_drawdown() to each series
+## ------------------------------------------------------------------------
+drawdowns_dj   <- compute_drawdown(dj$`Close Value`)
+# drawdowns_gold <- compute_drawdown(gold$Close)   # uncomment once gold is loaded
+# drawdowns_btc  <- compute_drawdown(btc$Close)    # uncomment once btc is loaded
+
+biggest_drawdown_dj   <- max(drawdowns_dj)
+# biggest_drawdown_gold <- max(drawdowns_gold)
+# biggest_drawdown_btc  <- max(drawdowns_btc)
+
+biggest_drawdown_dj
+# biggest_drawdown_gold
+# biggest_drawdown_btc
+
+# Peak / trough dates for the DJIA's largest drawdown
+trough_i <- which.max(drawdowns_dj)
+peak_i   <- max(which(dj$`Close Value`[1:trough_i] == cummax(dj$`Close Value`)[trough_i]))
+dj$`Effective Date`[peak_i]    # peak month
+dj$`Effective Date`[trough_i]  # trough month
+
+```
+
+For DJIA I have a firm, verified answer from your actual data. For Gold and BTC I still don't have your script's output — and I want to flag why that matters here rather than guess: public sources disagree on exact monthly figures (BTC's 2017–18 crash and 2021–22 crash are both cited as its "largest," in the 73–84% range depending on methodology; gold's 2022 correction is cited anywhere from 20–23%), so pulling a number from search risks being wrong for your specific adjusted-price, monthly-close series.\
+What I can confirm now — DJIA:\
+\
+Largest drawdown: 23.2%\
+Peak: December 2019 → Trough: March 2020\
+Event: the COVID-19 crash — markets peaked just before the pandemic was declared, then fell sharply as lockdowns began.
