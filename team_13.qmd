@@ -6,6 +6,434 @@ editor: visual
 
 ## Task 1: EPL
 
+### 1.1 Generating the League Table
+```{r}
+library(tidyverse)
+library(gt)
+library(conflicted)
+
+conflicts_prefer(dplyr::filter)
+```
+
+```{r}
+epl_results <- read_csv(
+  "data/epl_results.csv",
+  show_col_types = FALSE
+)
+
+epl_teams <- read_csv(
+  "data/epl_teams.csv",
+  show_col_types = FALSE
+)
+```
+
+```{r}
+epl_teams <- epl_teams |>
+  select(
+    team = 1,
+    team_abbr = 2
+  ) |>
+  mutate(
+    team_abbr = str_to_lower(team_abbr)
+  )
+```
+
+```{r}
+matches <- epl_results |>
+  pivot_longer(
+    cols = -home_team,
+    names_to = "away_team",
+    values_to = "score"
+  ) |>
+  filter(score != "-") |>
+  separate(
+    col = score,
+    into = c("home_goals", "away_goals"),
+    sep = "-",
+    convert = TRUE
+  ) |>
+  mutate(
+    home_team = str_to_lower(home_team),
+    away_team = str_to_lower(away_team)
+  )
+
+home_performance <- matches |>
+  mutate(
+    team_abbr = home_team,
+    goals_scored = home_goals,
+    goals_conceded = away_goals,
+    points = case_when(
+      home_goals > away_goals ~ 3,
+      home_goals == away_goals ~ 1,
+      TRUE ~ 0
+    )
+  ) |>
+  select(
+    team_abbr,
+    goals_scored,
+    goals_conceded,
+    points
+  )
+
+away_performance <- matches |>
+  mutate(
+    team_abbr = away_team,
+    goals_scored = away_goals,
+    goals_conceded = home_goals,
+    points = case_when(
+      away_goals > home_goals ~ 3,
+      away_goals == home_goals ~ 1,
+      TRUE ~ 0
+    )
+  ) |>
+  select(
+    team_abbr,
+    goals_scored,
+    goals_conceded,
+    points
+  )
+
+league_table <- bind_rows(
+  home_performance,
+  away_performance
+) |>
+  group_by(team_abbr) |>
+  summarise(
+    points = sum(points),
+    goals_scored = sum(goals_scored),
+    goals_conceded = sum(goals_conceded),
+    .groups = "drop"
+  ) |>
+  mutate(
+    goal_diff = goals_scored - goals_conceded
+  ) |>
+  left_join(
+    epl_teams,
+    by = "team_abbr"
+  ) |>
+  arrange(
+    desc(points),
+    desc(goal_diff),
+    desc(goals_scored)
+  ) |>
+  mutate(
+    rank = row_number()
+  ) |>
+  select(
+    rank,
+    team,
+    points,
+    goal_diff,
+    goals_scored
+  )
+
+league_table |>
+  gt() |>
+  tab_header(
+    title = md("**English Premier League 2019–2020**"),
+    subtitle = "Final Season Results"
+  ) |>
+  cols_label(
+    rank = "Rank",
+    team = "Team",
+    points = "Points",
+    goal_diff = "Goal Difference",
+    goals_scored = "Goals Scored"
+  ) |>
+  cols_align(
+    align = "left",
+    columns = team
+  ) |>
+  cols_align(
+    align = "center",
+    columns = c(rank, points, goal_diff, goals_scored)
+  ) |>
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_body(
+      columns = c(rank, team)
+    )
+  ) |>
+  tab_style(
+    style = cell_fill(color = "#E7E7E7"),
+    locations = cells_body(
+      rows = rank %% 2 == 0
+    )
+  ) |>
+  tab_style(
+    style = cell_fill(color = "limegreen"),
+    locations = cells_body(
+      rows = rank <= 4
+    )
+  ) |>
+  tab_style(
+    style = cell_fill(color = "red"),
+    locations = cells_body(
+      rows = rank >= max(rank) - 2
+    )
+  ) |>
+  tab_source_note(
+    source_note = md(
+      "**Green:** Qualified for Champions League  
+       **Red:** Relegated"
+    )
+  ) |>
+  tab_options(
+    table.width = pct(100),
+    heading.align = "left"
+  )
+```
+
+### 1.2 Metrics
+For the Upset Scoring Index, an upset is defined as scoring more or fewer goals per match against the top six teams than the average achieved by all 14 non-top-six teams. A positive metric value represents above-average scoring against stronger opposition, while a negative value represents below-average scoring.
+
+```{r}
+top_6 <- league_table |>
+  filter(rank <= 6) |>
+  left_join(
+    epl_teams,
+    by = "team"
+  ) |>
+  select(
+    team_abbr,
+    team
+  )
+
+bottom_14 <- league_table |>
+  filter(rank > 6) |>
+  left_join(
+    epl_teams,
+    by = "team"
+  ) |>
+  select(
+    team_abbr,
+    team
+  )
+
+top_6_abbr <- top_6$team_abbr
+bottom_14_abbr <- bottom_14$team_abbr
+
+top_6_matches <- matches |>
+  filter(
+    (home_team %in% top_6_abbr &
+       away_team %in% bottom_14_abbr) |
+      (home_team %in% bottom_14_abbr &
+         away_team %in% top_6_abbr)
+  )
+
+bottom_14_home <- top_6_matches |>
+  filter(home_team %in% bottom_14_abbr) |>
+  mutate(
+    team_abbr = home_team,
+    goals_against_top_6 = home_goals
+  ) |>
+  select(
+    team_abbr,
+    goals_against_top_6
+  )
+
+bottom_14_away <- top_6_matches |>
+  filter(away_team %in% bottom_14_abbr) |>
+  mutate(
+    team_abbr = away_team,
+    goals_against_top_6 = away_goals
+  ) |>
+  select(
+    team_abbr,
+    goals_against_top_6
+  )
+
+bottom_14_results <- bind_rows(
+  bottom_14_home,
+  bottom_14_away
+)
+
+overall_scoring <- bottom_14_results |>
+  summarise(
+    total_goals = sum(goals_against_top_6),
+    total_matches = n(),
+    average_goals = total_goals / total_matches
+  )
+
+overall_average <- overall_scoring$average_goals
+
+upset_scoring_table <- bottom_14_results |>
+  group_by(team_abbr) |>
+  summarise(
+    total_goals = sum(goals_against_top_6),
+    matches_played = n(),
+    average_goals = total_goals / matches_played,
+    .groups = "drop"
+  ) |>
+  mutate(
+    metric_value = average_goals - overall_average,
+    performance = case_when(
+      metric_value > 0 ~ "Above average",
+      metric_value < 0 ~ "Below average",
+      TRUE ~ "Equal to average"
+    )
+  ) |>
+  left_join(
+    epl_teams,
+    by = "team_abbr"
+  ) |>
+  arrange(
+    desc(metric_value),
+    desc(total_goals)
+  ) |>
+  mutate(
+    metric_rank = row_number()
+  ) |>
+  select(
+    metric_rank,
+    team,
+    metric_value,
+    total_goals,
+    matches_played,
+    average_goals,
+    performance
+  )
+
+average_row <- tibble(
+  metric_rank = NA_integer_,
+  team = "Average",
+  metric_value = 0,
+  total_goals = mean(upset_scoring_table$total_goals),
+  matches_played = mean(upset_scoring_table$matches_played),
+  average_goals = overall_average,
+  performance = "Average"
+)
+
+upset_scoring_table <- rbind(
+  upset_scoring_table,
+  average_row
+) |>
+  arrange(
+    desc(average_goals)
+  )
+
+overall_scoring
+```
+
+```{r}
+green_fill <- "limegreen"
+red_fill <- "red"
+
+dark_green <- adjustcolor(
+  green_fill,
+  red.f = 0.8,
+  green.f = 0.8,
+  blue.f = 0.8
+)
+
+dark_red <- adjustcolor(
+  red_fill,
+  red.f = 0.8,
+  green.f = 0.8,
+  blue.f = 0.8
+)
+
+upset_scoring_table |>
+  gt() |>
+  sub_missing(
+    columns = metric_rank,
+    missing_text = ""
+  ) |>
+  tab_header(
+    title = md("**Upset Scoring Index**"),
+    subtitle = "Goals scored against the EPL Top Six"
+  ) |>
+  cols_label(
+    metric_rank = "Rank",
+    team = "Team",
+    metric_value = "Metric Value",
+    total_goals = "Total Goals",
+    matches_played = "Matches",
+    average_goals = "Goals per Match",
+    performance = "Comparison"
+  ) |>
+  fmt_number(
+    columns = c(
+      metric_value,
+      total_goals,
+      matches_played,
+      average_goals
+    ),
+    decimals = 2
+  ) |>
+  cols_align(
+    align = "left",
+    columns = c(team, performance)
+  ) |>
+  cols_align(
+    align = "center",
+    columns = c(
+      metric_rank,
+      metric_value,
+      total_goals,
+      matches_played,
+      average_goals
+    )
+  ) |>
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_body(
+      columns = c(metric_rank, team)
+    )
+  ) |>
+  tab_style(
+    style = cell_fill(color = green_fill),
+    locations = cells_body(
+      rows = metric_value > 0
+    )
+  ) |>
+  tab_style(
+    style = cell_fill(color = dark_green),
+    locations = cells_body(
+      rows = metric_value > 0 &
+        metric_rank %% 2 == 0
+    )
+  ) |>
+  tab_style(
+    style = cell_fill(color = red_fill),
+    locations = cells_body(
+      rows = metric_value < 0
+    )
+  ) |>
+  tab_style(
+    style = cell_fill(color = dark_red),
+    locations = cells_body(
+      rows = metric_value < 0 &
+        metric_rank %% 2 != 0
+    )
+  ) |>
+  tab_style(
+    style = cell_fill(color = "#CFE8FF"),
+    locations = cells_body(
+      rows = metric_value == 0 &
+        performance == "Average"
+    )
+  ) |>
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_body(
+      rows = metric_value == 0 &
+        performance == "Average"
+    )
+  ) |>
+  tab_source_note(
+    source_note = md(
+      "**Positive:** Above the overall scoring average  
+       **Negative:** Below the overall scoring average  
+       **Blue:** Overall average"
+    )
+  ) |>
+  tab_options(
+    table.width = pct(100),
+    heading.align = "left"
+  )
+```
+
 ## Task 2: Investment Market Price
 
 ## Task 3: Visualising Singapore Tourist Spending
