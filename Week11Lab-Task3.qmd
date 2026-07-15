@@ -1,0 +1,282 @@
+---
+title: "Week11Lab-Task3"
+format: html
+---
+
+```{r}
+library(tidyverse)
+
+tourism <- read_csv(
+  "singapore_tourism_receipts.csv",
+  show_col_types = FALSE
+)
+
+item_order <- c(
+  "Sightseeing, Entertainment & Gaming",
+  "Shopping",
+  "Other Components",
+  "Food & Beverage",
+  "Accommodation"
+)
+
+tourism_plot <- tourism |>
+  mutate(
+    quarter = factor(
+      quarter,
+      levels = sort(unique(quarter))
+    ),
+
+    item = factor(
+      item,
+      levels = item_order
+    ),
+
+    # Convert million SGD to billion SGD
+    value_billion = value / 1000,
+
+    # Only label larger sections to prevent overcrowding
+    value_label = if_else(
+      value_billion >= 2.5,
+      sprintf("%.3f", value_billion),
+      NA_character_
+    )
+  )
+quarter_totals <- tourism_plot |>
+  group_by(quarter) |>
+  summarise(
+    total_billion = sum(value_billion),
+    .groups = "drop"
+  )
+```
+
+```{r, fig.width=9, fig.height=9}
+events <- tibble(
+  quarter_text = c(
+    "2020-Q2",
+    "2022-Q2"
+  ),
+
+  annotation_position = c(
+    8.5,
+    11.5
+  ),
+
+  event_label = c(
+    "COVID-19 Circuit Breaker\nand border restrictions",
+    "Singapore reopened borders\nunder the Vaccinated Travel Framework"
+  )
+) |>
+  mutate(
+    quarter = factor(
+      quarter_text,
+      levels = levels(tourism_plot$quarter)
+    )
+  ) |>
+  left_join(
+    quarter_totals,
+    by = "quarter"
+  )
+
+receipt_colours <- c(
+  "Sightseeing, Entertainment & Gaming" = "#00496F",
+  "Shopping"                             = "#0F85A0",
+  "Other Components"                    = "#F0DA3E",
+  "Food & Beverage"                     = "#ED8B00",
+  "Accommodation"                       = "#DD4124"
+)
+
+font_used <- "serif"
+
+
+tourism_receipts_plot <- ggplot(
+  tourism_plot,
+  aes(
+    x = quarter,
+    y = value_billion,
+    fill = item
+  )
+) +
+
+  # Stacked bars
+  geom_col(
+    width = 0.88,
+    position = position_stack(reverse = TRUE)
+  ) +
+
+  # Value labels
+  geom_text(
+    aes(label = value_label),
+    position = position_stack(
+      vjust = 0.5,
+      reverse = TRUE
+    ),
+    family = font_used,
+    size = 4.5,
+    colour = "black",
+    na.rm = TRUE
+  ) +
+
+  # Arrows pointing from the event labels to the relevant bars
+  geom_segment(
+    data = events,
+    aes(
+      x = quarter,
+      xend = quarter,
+      y = annotation_position - 1.8,
+      yend = total_billion + 0.25
+    ),
+    inherit.aes = FALSE,
+    colour = "#555555",
+    linewidth = 0.4,
+    arrow = grid::arrow(
+      length = grid::unit(0.09, "inches"),
+      type = "closed"
+    )
+  ) +
+
+  # Event labels
+  geom_label(
+    data = events,
+    aes(
+      x = quarter,
+      y = annotation_position,
+      label = event_label
+    ),
+    inherit.aes = FALSE,
+    family = font_used,
+    size = 3.5,
+    lineheight = 0.9,
+    fill = "#FDF6E3",
+    colour = "#222222",
+    linewidth = 0.25,
+    label.padding = grid::unit(0.12, "lines")
+  ) +
+
+  # Manual colours
+  scale_fill_manual(
+    values = receipt_colours,
+    breaks = item_order,
+    drop = FALSE
+  ) +
+
+  # Amount scale
+  scale_y_continuous(
+    limits = c(0, 31.5),
+    breaks = seq(0, 30, 10),
+    minor_breaks = seq(5, 25, 10),
+    expand = expansion(mult = c(0, 0))
+  ) +
+
+  # Turn vertical columns into horizontal bars
+  coord_flip(
+    clip = "off"
+  ) +
+
+  # Titles and labels
+  labs(
+    title = "Singapore 2019–2024 Quarterly Tourism Receipts By Major Components",
+    x = "Quarter",
+    y = "Amount (Billion SGD)",
+    fill = NULL,
+    caption = "Source: singstat.gov.sg"
+  ) +
+
+  # Legend layout
+  guides(
+    fill = guide_legend(
+      ncol = 2,
+      byrow = FALSE
+    )
+  ) +
+
+  # Overall theme
+  theme_minimal(
+    base_size = 11,
+    base_family = font_used
+  ) +
+
+  theme(
+    text = element_text(
+      family = font_used
+    ),
+
+    plot.background = element_rect(
+      fill = "#FDF6E3",
+      colour = NA
+    ),
+
+    panel.background = element_rect(
+      fill = "white",
+      colour = NA
+    ),
+
+    panel.grid.major = element_line(
+      colour = "#E5E5E5",
+      linewidth = 0.5
+    ),
+
+    panel.grid.minor = element_line(
+      colour = "#F1F1F1",
+      linewidth = 0.4
+    ),
+
+    plot.title = element_text(
+      face = "bold",
+      size = 16,
+      hjust = 0.5,
+      margin = margin(b = 10)
+    ),
+
+    axis.title.x = element_text(
+      size = 11,
+      margin = margin(t = 8)
+    ),
+
+    axis.title.y = element_text(
+      size = 11,
+      margin = margin(r = 14)
+    ),
+
+    axis.text.y = element_text(
+      angle = 45,
+      hjust = 1,
+      vjust = 0.5,
+      size = 9.5,
+      margin = margin(r = 10)
+    ),
+
+    axis.text.x = element_text(
+      size = 9,
+      margin = margin(t = 4)
+    ),
+
+    legend.position = "top",
+    legend.justification = "center",
+
+    legend.text = element_text(
+      size = 10.5
+    ),
+
+    legend.key.width = grid::unit(0.62, "cm"),
+    legend.key.height = grid::unit(0.62, "cm"),
+    legend.spacing.x = grid::unit(0.2, "cm"),
+    legend.spacing.y = grid::unit(0.1, "cm"),
+
+    plot.caption = element_text(
+      hjust = 1,
+      size = 8
+    ),
+
+    plot.margin = margin(
+      t = 8,
+      r = 10,
+      b = 8,
+      l = 10
+    )
+  )
+
+tourism_receipts_plot
+
+```
+
+Tourism receipts fell sharply during the COVID-19 period, with the cumulative total reaching only S$4,188 billion in 2020-Q2, compared with S$27,689 billion in 2019-Q4. Recovery became clearer after Singapore reopened its borders, rising from S$4,574 billion in 2022-Q2 to S$14,178 billion in 2022-Q4. By 2024-Q4, total receipts reached S$29,781 billion, exceeding the 2019-Q4 level. Other Components was the largest category in 2024-Q4 at S$9,104 billion.
