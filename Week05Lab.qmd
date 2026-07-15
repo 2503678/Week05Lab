@@ -10,7 +10,7 @@ editor: visual
 install.packages("gt")
 ```
 
-``` {r}
+```{r}
 library(tidyverse)
 library(dplyr)
 library(conflicted)
@@ -20,7 +20,7 @@ conflicts_prefer(dplyr::lag)
 
 ```
 
-``` {r}
+```{r}
 readr::read_csv("country_codes.csv")
 
 # Adjusted Net National Income
@@ -35,7 +35,7 @@ readr::read_csv("world_bank_total_population/Metadata_Country_API_SP.POP.TOTL_DS
 
 ```
 
-``` {r}
+```{r}
 # Task 1.1: Cleaning the Data
 clean_up_wb_csv <- function(
     in_file_name,
@@ -80,25 +80,32 @@ indicator <- clean_up_wb_csv("AdjustedNetNationalIncome/API_NY.ADJ.NNTY.KD_DS2_e
 population <- clean_up_wb_csv("world_bank_total_population/API_SP.POP.TOTL_DS2_en_csv_v2_267553.csv", "population.csv")
 ```
 
-``` {r}
-# Task 1.3: Removing Rows not Pertaining to Countries
+
+```{R}
 country_codes <- read.csv("country_codes.csv")
+nrow(indicator)
+nrow(population)
+
+reducing_function <- function(
+    old_table, new_table, country_codes) {
+  new_table <- old_table |>
+  semi_join(country_codes, by = c("Country Code" = "country_code"))
+}
+
+population_reduced <- reducing_function(population, population_reduced, country_codes)
+indicator_reduced <- reducing_function(indicator, indicator_reduced, country_codes)
+
+population_reduced
+indicator_reduced
+```
+
+
+```{r}
+df_subset <- inner_join(indicator, population, by = "Country Name") |> select("Country Name", "Country Code", "")
+df_subset
+```
+
+```{r}
 
 ```
 
-``` {r}
-
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
-
-You can add options to executable code like this
-
-
-
-The `echo: false` option disables the printing of code (only output is displayed).
