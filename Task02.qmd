@@ -1,0 +1,180 @@
+---
+title: "Task02"
+format: html
+editor: visual
+---
+
+Task 2: Activation Function Analysis
+
+------------------------------------------------------------------------
+
+## **2.1 Visualizing `swish()` Activation Function and its Gradient**
+
+```{r}
+#| echo: true
+library(tidyverse)
+```
+
+You can add options to executable code like this
+
+```{r}
+
+#| eval: true
+#| echo: true
+#| label: fig-swish
+#| fig-cap: "Swish Activation Function"
+#| fig-width: 7
+#| fig-height: 4
+
+swish <- function(x) {
+  x / (1 + exp(-x))
+}
+
+x <- -10:10
+y <- swish(x)
+tbl_swish <- tibble(x, y)
+
+ggplot(tbl_swish, aes(x, y)) +
+  geom_line(color = "darkblue", linewidth = 1) +
+  labs(x = "x", y = "swish(x)")
+
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
+
+```{r}
+#| eval: true
+#| echo: true
+#| output: true
+#| label: fig-d-swish
+#| fig-cap: "Gradient of Swish Activation Function"
+#| fig-width: 7
+#| fig-height: 4
+
+d_swish <- function(x) {
+  sigmoid <- 1 / (1 + exp(-x))
+  sigmoid + x * sigmoid * (1 - sigmoid)
+}
+
+x <- -10:10
+y <- d_swish(x)
+tbl_d_swish <- tibble(x, y)
+
+ggplot(tbl_d_swish, aes(x, y)) +
+  geom_line(color = "darkblue", linewidth = 1) +
+  labs(x = "x", y = "d_swish(x)")
+
+```
+
+Unlike ReLU, whose gradient is strictly 0 for negative inputs and 1 for positive inputs, the gradient of Swish is smooth and non-zero for most inputs, with values that gradually transition rather than being abruptly cut off. This helps avoid the dying neuron problem seen in ReLU, where neurons with negative inputs stop learning entirely. However, Swish is computationally more expensive as it requires calculating the sigmoid function, while ReLU involves only a simple threshold operation.
+
+## **2.2 Toy Examples Calling `swish()` and `relu()`**
+
+```{r}
+#| eval: true
+#| echo: true
+
+student_ids <- c(2501174, 2501901, 2500511, 2503678, 2501103)
+
+student_ids <- c(2501174, 2501901, 2500511, 2503678, 2501103)
+seed <- as.integer(median(student_ids))
+# Replace with the median of your team's student IDs
+set.seed(seed)  # <-- change this to your team's median student ID
+
+# Define relu() if not already defined
+relu <- function(x) {
+  ifelse(x > 0, x, 0)
+}
+
+# Generate 100 random values between -10 and 10
+x <- runif(100, min = -10, max = 10)
+
+# Create tibble
+tbl_activations <- tibble(
+  x        = x,
+  swish_x  = round(swish(x), 2),
+  relu_x   = round(relu(x), 2)
+)
+
+# Display first 10 rows
+head(tbl_activations, 10)
+```
+
+```{r}
+#| eval: true
+#| echo: true
+
+# Add is_dead column
+tbl_activations <- tbl_activations |>
+  mutate(is_dead = relu_x == 0)
+
+# Display first 10 rows with selected columns
+tbl_activations |>
+  select(x, swish_x, relu_x, is_dead) |>
+  head(10)
+
+# Summary table
+tbl_summary <- tibble(
+  relu_dead_count = sum(tbl_activations$is_dead),
+  swish_mean      = round(mean(tbl_activations$swish_x), 2),
+  swish_sd        = round(sd(tbl_activations$swish_x), 2),
+  relu_mean       = round(mean(tbl_activations$relu_x), 2),
+  relu_sd         = round(sd(tbl_activations$relu_x), 2)
+)
+
+tbl_summary
+```
+
+The statistics support the claim that Swish avoids dead neurons. While ReLU produces exactly zero for all negative inputs while being reflected by a non-zero relu_dead_count of approximately 50 out of 100 samples, Swish returns small but non-zero values for negative inputs. Swish also shows a higher mean and standard deviation compared to ReLU, indicating more active and varied neuron outputs, which promotes better gradient flow and more effective learning during training.
+
+```{r}
+#| eval: true
+#| echo: true
+
+# Reshape to long format
+tbl_long <- tbl_activations |>
+  select(x, swish_x, relu_x) |>
+  pivot_longer(
+    cols      = c(swish_x, relu_x),
+    names_to  = "function_name",
+    values_to = "activation_value"
+  )
+
+# Display first 10 rows
+head(tbl_long, 10)
+
+# Summary table grouped by function_name
+tbl_long |>
+  group_by(function_name) |>
+  summarise(
+    mean = round(mean(activation_value), 2),
+    sd   = round(sd(activation_value), 2),
+    min  = round(min(activation_value), 2),
+    max  = round(max(activation_value), 2)
+  )
+
+```
+
+## **2.3 Exploring Activation Functions**
+
+```{r}
+#| eval: true
+#| echo: true
+
+# Define ELU function (alpha = 1 by default)
+elu <- function(x, alpha = 1) {
+  ifelse(x > 0, x, alpha * (exp(x) - 1))
+}
+
+# Add elu_x column to existing tibble
+tbl_activations <- tbl_activations |>
+  mutate(elu_x = round(elu(x), 2))
+
+# Display first 10 rows with selected columns
+tbl_activations |>
+  select(x, swish_x, relu_x, elu_x) |>
+  head(10)
+```
+
+Description of other activation functions:
+ELU is an activation function that outputs the input directly if positive, but uses an exponential curve for negative values to smooth gradients and prevent inactive neurons
